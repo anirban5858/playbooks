@@ -1,0 +1,66 @@
+---
+- hosts: "{{ hosts_name }}"
+
+  vars_prompt:
+   - name: "hosts_name"
+     prompt: "Enter the Host or Host group need to run with this Playbook"
+     private: no
+
+   - name: "disk_name"
+     prompt: "Disk used for creating partitioni, ( ex: /dev/sdb,/dev/sdc etc. )"
+     private: no
+
+   - name: "pv_name"
+     prompt: "Disk name after creating with partition ( ex: /dev/sdb1,/dev/sdc1 etc. )"
+     private: no
+
+   - name: "vg_name"
+     prompt: "Enter VG name to be created ( ex: vg1,vg01 etc. )"
+     private: no
+
+   - name: "lv_name"
+     prompt: "Enter LV name to be created ( ex: lv1,lv01 etc. )"
+     private: no
+
+   - name: "file_system"
+     prompt: "Type of file system required ( ex.  ext3, ext4 or xfs etc. )"
+     private: no
+
+   - name: "mount_point"
+     prompt: "Where need to mount ( ex. /data,/data_disk etc "
+     private: no
+   
+  tasks:
+   - name: Create Partition
+     shell:
+       /bin/echo -e "n\np\n1\n\n\nt\n8e\nw" | sudo fdisk "{{ disk_name }}"
+
+   - name: Create VG for vg1
+     lvg:
+       vg: "{{ vg_name }}"
+       pvs: "{{ pv_name }}"
+       pesize: 8
+
+   - name: Create LVM lv1
+     lvol:
+       vg: "{{ vg_name }}"
+       lv: "{{ lv_name }}"
+       size: 100%FREE
+
+   - name: Create the file system
+     filesystem:
+       fstype: "{{ file_system }}"
+       dev: "/dev/mapper/{{ vg_name }}-{{ lv_name }}"
+   
+   - name: Create a directory to mount the filesystem.
+     file:
+       path: "{{ mount_point }}"
+       state: directory
+       mode: '0755'
+
+   - name: Mount the created filesystem
+     mount:
+       path: "{{ mount_point }}"
+       src: "/dev/mapper/{{ vg_name }}-{{ lv_name }}"
+       fstype: "{{ file_system }}"
+       state: mounted
