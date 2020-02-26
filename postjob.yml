@@ -1,0 +1,97 @@
+---
+- name: Play to configure OSP VM
+  hosts: all
+  become: true
+  remote_user: root
+  ignore_errors: yes
+
+  tasks:
+    - name: create host entry for satellite
+      lineinfile:
+        dest: /etc/hosts
+        line: "172.20.44.11 wb-sdc-sat01.wbsdc.in\n"
+   
+    - name: unregister and register with RedHat Subscription
+      shell: |
+        subscription-manager unregister
+        subscription-manager clean
+        rpm -ivh http://172.20.44.11/pub/katello-ca-consumer-latest.noarch.rpm
+        subscription-manager register --org="WBSDC" --activationkey="rhel7-common-production"
+        yum install katello-agent.noarch -y
+
+    - name: start and enable goferd
+      service:
+        name: goferd
+        state: restarted
+        enabled: yes
+
+    - name: install important packages
+      yum:
+        name: vim,glibc,libgcc,zlib,bzip2,libuuid,nss-softokn-freebl,perl-Sys-Syslog,compat-libstdc++-33,net-snmp,net-snmp-libs,net-snmp-utils,wget,chrony,nfs-utils,lvm2,net-tools,telnet
+        state: latest
+
+    - name: start and enable NTP
+      service:
+        name: chronyd
+        state: started
+        enabled: yes
+
+
+    - name: start and enable SNMP
+      service:
+        name: snmpd
+        state: started
+        enabled: yes
+
+    - name: configure SNMP
+      lineinfile:
+        dest: /etc/snmp/snmpd.conf
+        line: "rocommunity commu@321\n"
+
+    - name: restart SNMP
+      service:
+        name: snmpd
+        state: restarted
+
+    - name: configure SSH and NTP
+      shell: |
+        sed -i '/server 3.rhel.pool.ntp.org iburst/a\server 172.20.32.23 iburst\nserver 172.20.32.25 iburst' /etc/chrony.conf
+        sed -i 's/^GSSAPIAuthentication[ \t].*$/GSSAPIAuthentication no/' /etc/ssh/sshd_config
+        sed -i '/rhel.pool.ntp.org/s/^/#/g' /etc/chrony.conf
+        timedatectl set-timezone Asia/Kolkata
+
+    - name: restart SSH
+      service:
+        name: sshd
+        state: restarted
+
+    - name: restart NTP
+      service:
+        name: chronyd
+        state: restarted
+
+    - name: download SPLX
+      get_url:
+        url: http://172.20.44.11/pub/SECAGT/SProtectLinux-3.0.bin
+        dest: /opt/SProtectLinux-3.0.bin
+        mode: 0755
+
+    - name: download SPLX md5
+      get_url:
+        url: http://172.20.44.11/pub/SECAGT/SProtectLinux-3.0.bin.md5
+        dest: /opt
+
+    - name: install ECAT Agent
+      shell: |
+        rpm -ivh http://172.20.44.11/pub/SECAGT/Agent-Core-RedHat_EL7-11.0.0-615.x86_64.rpm
+        rpm -ivh http://172.20.44.11/pub/SECAGT/ecatagent\(64-bit\).rpm
+
+    - name: stop and disable firewall
+      service:
+        name: firewalld
+        state: stopped
+        enabled: false
+
+    - name: reboot the system
+      command: reboot
+      
