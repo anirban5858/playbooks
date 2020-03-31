@@ -1,0 +1,18 @@
+---
+- name: Play to configure proxy
+  hosts: all
+  remote_user: root
+  become: yes
+  ignore_errors: yes
+
+  tasks:
+    - name: Configure proxy
+      shell: |
+        echo "export http_proxy="http://172.19.99.41:8080"">>.bash_profile
+        echo "export https_proxy="https://172.19.99.41:8080"">>.bash_profile
+        echo "export no_proxy="127.0.0.1,localhost,172.20.,"">>.bash_profile
+        echo "export no_proxy="127.0.0.1,localhost,172.20.44.11,wb-sdc-sat01.wbsdc.in"">>.bash_profile
+        echo "export http_proxy="http://172.19.99.41:8080"">>.bashrc
+        echo "export https_proxy="https://172.19.99.41:8080"">>.bashrc
+        echo "export no_proxy="127.0.0.1,localhost,172.20.,"">>.bashrc
+        echo "export no_proxy="127.0.0.1,localhost,172.20.44.11,wb-sdc-sat01.wbsdc.in"">>.bashrc

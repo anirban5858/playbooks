@@ -1,17 +1,17 @@
 ---
-- name: Play to configure OSP VM
+- name: Play to configure OSP VMs
   hosts: all
   become: true
   remote_user: root
   ignore_errors: yes
 
   tasks:
-    - name: create host entry for satellite
+    - name: Create host entry for satellite
       lineinfile:
         dest: /etc/hosts
         line: "172.20.44.11 wb-sdc-sat01.wbsdc.in\n"
    
-    - name: unregister and register with RedHat Subscription
+    - name: Unregister and Register with RedHat Subscription
       shell: |
         subscription-manager unregister
         subscription-manager clean
@@ -19,56 +19,67 @@
         subscription-manager register --org="WBSDC" --activationkey="rhel7-common-production"
         yum install katello-agent.noarch -y
 
-    - name: start and enable goferd
+    - name: Start and Enable goferd
       service:
         name: goferd
         state: restarted
         enabled: yes
 
-    - name: install important packages
+    - name: Install Important Packages
       yum:
-        name: vim,glibc,libgcc,zlib,bzip2,libuuid,nss-softokn-freebl,perl-Sys-Syslog,compat-libstdc++-33,net-snmp,net-snmp-libs,net-snmp-utils,wget,chrony,nfs-utils,lvm2,net-tools,telnet
-        state: latest
+        name:
+          - vim
+          - glibc
+          - libgcc
+          - zlib
+          - bzip2
+          - libuuid
+          - nss-softokn-freebl
+          - perl-Sys-Syslog
+          - compat-libstdc++-33
+          - net-snmp
+          - net-snmp-libs
+          - net-snmp-utils
+          - wget
+          - chrony
+          - nfs-utils
+          - lvm2
+          - net-tools
+          - telnet
+          - yum-utils
+        state: present
 
-    - name: start and enable NTP
-      service:
-        name: chronyd
+    - name: Restart SSH,NTP,SNMP
+      systemd:
+        name: "{{ item }}"
         state: started
-        enabled: yes
+      with_items:
+        - sshd
+        - chronyd
+        - snmpd
 
-
-    - name: start and enable SNMP
-      service:
-        name: snmpd
-        state: started
-        enabled: yes
-
-    - name: configure SNMP
+    - name: Configure SNMP
       lineinfile:
         dest: /etc/snmp/snmpd.conf
         line: "rocommunity commu@321\n"
 
-    - name: restart SNMP
-      service:
-        name: snmpd
-        state: restarted
-
-    - name: configure SSH and NTP
+    - name: Configure SELinux, firewall, SSH and NTP
       shell: |
-        sed -i '/server 3.rhel.pool.ntp.org iburst/a\server 172.20.32.23 iburst\nserver 172.20.32.25 iburst' /etc/chrony.conf
-        sed -i 's/^GSSAPIAuthentication[ \t].*$/GSSAPIAuthentication no/' /etc/ssh/sshd_config
+        sed -i.bak '/server 3.rhel.pool.ntp.org iburst/a\server 172.20.32.12 iburst\nserver 172.20.32.23 iburst\nserver 172.20.32.25 iburst' /etc/chrony.conf
         sed -i '/rhel.pool.ntp.org/s/^/#/g' /etc/chrony.conf
+        sed -i.bak 's/^GSSAPIAuthentication[ \t].*$/GSSAPIAuthentication no/' /etc/ssh/sshd_config
+        sed -i.bak 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+        systemctl mask firewalld
         timedatectl set-timezone Asia/Kolkata
 
-    - name: restart SSH
-      service:
-        name: sshd
+    - name: Restart SSH,NTP,SNMP
+      systemd:
+        name: "{{ item }}"
         state: restarted
-
-    - name: restart NTP
-      service:
-        name: chronyd
-        state: restarted
+      with_items:
+        - sshd
+        - chronyd
+        - snmpd
 
     - name: download SPLX
       get_url:
@@ -86,12 +97,6 @@
         rpm -ivh http://172.20.44.11/pub/SECAGT/Agent-Core-RedHat_EL7-11.0.0-615.x86_64.rpm
         rpm -ivh http://172.20.44.11/pub/SECAGT/ecatagent\(64-bit\).rpm
 
-    - name: stop and disable firewall
-      service:
-        name: firewalld
-        state: stopped
-        enabled: false
-
-    - name: reboot the system
+    - name: Reboot the VMs
       command: reboot
-      
+...

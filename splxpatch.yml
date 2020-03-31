@@ -1,0 +1,23 @@
+---
+- name: Play to configure OSP VMs
+  hosts: all
+  become: true
+  remote_user: root
+  ignore_errors: yes
+
+  tasks:
+    - name: Download SPLX patch
+      get_url:
+        url: http://172.20.44.11/pub/SECAGT/splx_30_lx_en_sp1_patch7.bin
+        dest: /opt/splx_30_lx_en_sp1_patch7.bin
+        mode: 0755
+
+    - name: Install SPLX Patch
+      shell:
+        /bin/echo -e "yes" | bash /opt/splx_30_lx_en_sp1_patch7.bin
+
+    - name: Restart SPLX service
+      service:
+        name: splx
+        state: restarted
+...
